@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    if (state.currentUser && state.currentUser.role === 'admin') {
+    if (state.currentUser && state.currentUser.role?.toLowerCase() === 'admin') {
         toggleAdminPanel(true);
     }
     setupEventListeners();
@@ -237,7 +237,10 @@ async function handleLogin(e) {
     const email = loginForm.querySelector('input[type="email"]').value;
     const password = loginForm.querySelector('input[type="password"]').value;
 
+    console.log('Attempting login for:', email);
     const users = await DB.getUsers();
+    console.log('Users found in DB:', users.length);
+
     const user = users.find(u => u.email === email && u.password === password);
 
     if (user) {
@@ -245,13 +248,18 @@ async function handleLogin(e) {
         localStorage.setItem('tms_active_user', JSON.stringify(user));
         updateUIForAuth();
         authModal.classList.add('hidden');
-        console.log('Login successful:', user.name);
-        alert(`Welcome back, ${user.name}!`);
-        if (user.role === 'admin') {
+        console.log('Login successful:', user.name, 'Role:', user.role);
+
+        if (user.role?.toLowerCase() === 'admin') {
+            console.log('Admin detected, toggling panel...');
             toggleAdminPanel(true);
+            alert(`Welcome Admin, ${user.name}!`);
+        } else {
+            alert(`Welcome back, ${user.name}!`);
         }
     } else {
-        alert('Invalid email or password');
+        console.error('Login failed: Invalid email or password');
+        alert('Invalid email or password. Please check your credentials or ensure the user exists in Supabase.');
     }
 }
 
@@ -411,7 +419,7 @@ function toggleAdminPanel(show) {
     const aboutSection = document.getElementById('about');
     const adminLink = document.getElementById('admin-link');
 
-    if (show && state.currentUser && state.currentUser.role === 'admin') {
+    if (show && state.currentUser && state.currentUser.role?.toLowerCase() === 'admin') {
         if (!adminLink) {
             const li = document.createElement('li');
             li.id = 'admin-link';
