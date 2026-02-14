@@ -334,49 +334,114 @@ function renderAdminDashboard() {
 
     const bookings = DB.getBookings();
     const users = DB.getUsers();
-    const totalRev = bookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
 
-    const statsHTML = `
-        <div class="admin-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:2rem">
-            <div class="glass-card" style="padding:1rem;text-align:center"><h4>Total Users</h4><div style="font-size:1.5rem;color:var(--primary)">${users.length}</div></div>
-            <div class="glass-card" style="padding:1rem;text-align:center"><h4>Total Bookings</h4><div style="font-size:1.5rem;color:var(--primary)">${bookings.length}</div></div>
-            <div class="glass-card" style="padding:1rem;text-align:center"><h4>Total Revenue</h4><div style="font-size:1.5rem;color:var(--primary)">₹${totalRev.toLocaleString()}</div></div>
+    // 1. Render Dashboard Stats & Visuals
+    const totalRev = bookings.reduce((s, b) => s + (b.totalPrice || b.total || 0), 0);
+    const syncedCount = bookings.filter(b => b.synced).length;
+
+    document.getElementById('admin-stats-container').innerHTML = `
+        <div class="glass-card" style="padding:1.5rem; text-align:center; border-left: 4px solid var(--primary)">
+            <h5 style="color:var(--text-muted); font-size:0.7rem; letter-spacing:1px; margin-bottom:0.5rem">TOTAL REVENUE</h5>
+            <div style="font-size:1.8rem; font-weight:800; color:var(--primary)">₹${totalRev.toLocaleString()}</div>
+        </div>
+        <div class="glass-card" style="padding:1.5rem; text-align:center; border-left: 4px solid #4ade80">
+            <h5 style="color:var(--text-muted); font-size:0.7rem; letter-spacing:1px; margin-bottom:0.5rem">TOTAL BOOKINGS</h5>
+            <div style="font-size:1.8rem; font-weight:800; color:#4ade80">${bookings.length}</div>
+        </div>
+        <div class="glass-card" style="padding:1.5rem; text-align:center; border-left: 4px solid #60a5fa">
+            <h5 style="color:var(--text-muted); font-size:0.7rem; letter-spacing:1px; margin-bottom:0.5rem">ACTIVE USERS</h5>
+            <div style="font-size:1.8rem; font-weight:800; color:#60a5fa">${users.length}</div>
+        </div>
+        <div class="glass-card" style="padding:1.5rem; text-align:center; border-left: 4px solid #fbbf24">
+            <h5 style="color:var(--text-muted); font-size:0.7rem; letter-spacing:1px; margin-bottom:0.5rem">CLOUD SYNC</h5>
+            <div style="font-size:1.8rem; font-weight:800; color:#fbbf24">${syncedCount}/${bookings.length}</div>
         </div>
     `;
 
-    const existingStats = adminSec.querySelector('.admin-stats');
-    if (existingStats) existingStats.remove();
-    adminSec.querySelector('.section-header').insertAdjacentHTML('afterend', statsHTML);
+    // Destination Chart
+    const destCounts = {};
+    bookings.forEach(b => {
+        const d = b.selections?.dest || 'none';
+        destCounts[d] = (destCounts[d] || 0) + 1;
+    });
+    const sortedDests = Object.entries(destCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const maxCount = sortedDests[0]?.[1] || 1;
 
-    document.getElementById('bookings-tbody').innerHTML = bookings.length === 0 ? '<tr><td colspan="7" style="text-align:center;padding:2rem">Local storage is empty</td></tr>' : bookings.map(b => `
+    document.getElementById('dest-chart').innerHTML = sortedDests.map(([name, count]) => `
+        <div style="display:flex; align-items:center; gap:1rem">
+            <div style="width:80px; font-size:0.7rem; font-weight:600">${cleanDisplay(name)}</div>
+            <div style="flex:1; height:8px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden">
+                <div style="height:100%; width:${(count / maxCount) * 100}%; background:var(--primary)"></div>
+            </div>
+            <div style="width:30px; font-size:0.7rem; color:var(--text-muted)">${count}</div>
+        </div>
+    `).join('') || '<div style="text-align:center; padding:1rem; font-size:0.8rem; color:var(--text-muted)">No data yet</div>';
+
+    // Recent Activity
+    document.getElementById('recent-activity').innerHTML = bookings.slice(-5).reverse().map(b => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:0.5rem; border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div>
+                <div style="font-weight:600">${b.userName}</div>
+                <div style="font-size:0.7rem; color:var(--text-muted)">Booked ${cleanDisplay(b.selections.dest)}</div>
+            </div>
+            <div style="color:var(--primary); font-weight:700">₹${(b.totalPrice || b.total).toLocaleString()}</div>
+        </div>
+    `).join('') || '<div style="text-align:center; padding:1rem; font-size:0.8rem; color:var(--text-muted)">No activity yet</div>';
+
+    // 2. Render Bookings Tab
+    document.getElementById('bookings-tbody').innerHTML = bookings.length === 0 ? '<tr><td colspan="7" style="text-align:center;padding:2rem">No bookings in history</td></tr>' : bookings.map(b => `
         <tr style="border-bottom:1px solid var(--glass-border)">
             <td style="padding:1rem">#${b.id.slice(-4)}</td>
             <td style="padding:1rem; font-weight:600">${b.userName}</td>
             <td style="padding:1rem">${cleanDisplay(b.selections.dest)}</td>
             <td style="padding:1rem; color:var(--primary); font-weight:700">₹${(b.totalPrice || b.total).toLocaleString()}</td>
             <td style="padding:1rem"><span style="background:var(--primary)22; color:var(--primary); padding:3px 10px; border-radius:10px; font-size:0.75rem">${b.status}</span></td>
-            <td style="padding:1rem; font-size:0.7rem">${b.synced ? '✅' : '⏳'}</td>
+            <td style="padding:1rem; font-size:1rem">${b.synced ? '✅' : '⏳'}</td>
             <td style="padding:1rem">
-                <button onclick="showBookingDetails('${b.id}')" class="btn-outline" style="padding:4px 8px; font-size:0.7rem; border-color:var(--primary); color:var(--primary)">View Details</button>
+                <button onclick="showBookingDetails('${b.id}')" class="btn-outline" style="padding:4px 12px; font-size:0.7rem; border-color:var(--primary); color:var(--primary)">VIEW BILL</button>
             </td>
         </tr>
     `).join('');
 
-    const uTbody = document.getElementById('users-tbody');
-    if (uTbody) {
-        uTbody.innerHTML = users.length === 0 ? '<tr><td colspan="3" style="text-align:center;padding:2rem">No users found</td></tr>' : users.map(u => `
-            <tr style="border-bottom:1px solid var(--glass-border)">
-                <td style="padding:1rem; font-weight:600">${u.name}</td>
-                <td style="padding:1rem; color:var(--text-muted)">${u.email}</td>
-                <td style="padding:1rem"><span style="background:var(--glass-border); padding:3px 8px; border-radius:4px; font-size:0.7rem">${u.role}</span></td>
-            </tr>
-        `).join('');
-    }
+    // 3. Render Users Tab (Spend Tracking)
+    const userStats = {};
+    users.forEach(u => {
+        userStats[u.email] = { name: u.name, bookings: 0, spent: 0, role: u.role };
+    });
+    bookings.forEach(b => {
+        const email = users.find(u => u.id === b.userId || u.name === b.userName)?.email;
+        if (email && userStats[email]) {
+            userStats[email].bookings++;
+            userStats[email].spent += (b.totalPrice || b.total || 0);
+        }
+    });
+
+    document.getElementById('users-tbody').innerHTML = Object.entries(userStats).map(([email, data]) => `
+        <tr style="border-bottom:1px solid var(--glass-border)">
+            <td style="padding:1rem; font-weight:600">${data.name}</td>
+            <td style="padding:1rem; color:var(--text-muted)">${email}</td>
+            <td style="padding:1rem; text-align:center">${data.bookings}</td>
+            <td style="padding:1rem; color:var(--primary); font-weight:700">₹${data.spent.toLocaleString()}</td>
+            <td style="padding:1rem"><span style="background:var(--glass-border); padding:3px 8px; border-radius:4px; font-size:0.7rem">${data.spent > 50000 ? '💎 VIP' : '⭐ Explorer'}</span></td>
+        </tr>
+    `).join('');
 }
 
 window.switchAdminTab = (name) => {
-    document.getElementById('admin-bookings-tab').classList.toggle('hidden', name !== 'bookings');
-    document.getElementById('admin-users-tab').classList.toggle('hidden', name !== 'users');
+    // Hide all tabs
+    document.getElementById('admin-dashboard-tab').classList.add('hidden');
+    document.getElementById('admin-bookings-tab').classList.add('hidden');
+    document.getElementById('admin-users-tab').classList.add('hidden');
+
+    // Show target tab
+    document.getElementById(`admin-${name}-tab`).classList.remove('hidden');
+
+    // Update buttons
+    const btns = document.querySelectorAll('.admin-tabs .btn-primary, .admin-tabs .btn-outline');
+    btns.forEach(btn => {
+        const isTarget = btn.getAttribute('onclick').includes(name);
+        btn.className = isTarget ? 'btn-primary' : 'btn-outline';
+    });
 };
 
 function animateValue(obj, end) {
