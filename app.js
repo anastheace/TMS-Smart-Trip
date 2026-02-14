@@ -364,12 +364,12 @@ function renderAdminDashboard() {
             const price = parseFloat(b.totalPrice) || parseFloat(b.total) || 0;
             return `
                 <tr style="border-bottom:1px solid var(--glass-border)">
-                    <td style="padding:1rem">#${bookingId}</td>
-                    <td style="padding:1rem; font-weight:600">${b.userName || 'Unknown'}</td>
-                    <td style="padding:1rem">${cleanDisplay(b.selections?.dest)}</td>
-                    <td style="padding:1rem; color:var(--primary); font-weight:700">₹${price.toLocaleString()}</td>
-                    <td style="padding:1rem"><span style="background:var(--primary)22; color:var(--primary); padding:3px 10px; border-radius:10px; font-size:0.75rem">${b.status || 'Pending'}</span></td>
-                    <td style="padding:1rem">
+                    <td data-label="ID" style="padding:1rem">#${bookingId}</td>
+                    <td data-label="Customer" style="padding:1rem; font-weight:600">${b.userName || 'Unknown'}</td>
+                    <td data-label="Package" style="padding:1rem">${cleanDisplay(b.selections?.dest)}</td>
+                    <td data-label="Total" style="padding:1rem; color:var(--primary); font-weight:700">₹${price.toLocaleString()}</td>
+                    <td data-label="Status" style="padding:1rem"><span style="background:var(--primary)22; color:var(--primary); padding:3px 10px; border-radius:10px; font-size:0.75rem">${b.status || 'Pending'}</span></td>
+                    <td data-label="View" style="padding:1rem">
                         <button onclick="showBookingDetails('${b.id}')" class="btn-outline" style="padding:4px 12px; font-size:0.7rem; border-color:var(--primary); color:var(--primary)">VIEW BILL</button>
                     </td>
                 </tr>
@@ -395,11 +395,11 @@ function renderAdminDashboard() {
         const statsArray = Object.entries(userStats);
         usersTbody.innerHTML = statsArray.length === 0 ? '<tr><td colspan="5" style="text-align:center;padding:2rem">No users registered</td></tr>' : statsArray.map(([email, data]) => `
             <tr style="border-bottom:1px solid var(--glass-border)">
-                <td style="padding:1rem; font-weight:600">${data.name}</td>
-                <td style="padding:1rem; color:var(--text-muted)">${email}</td>
-                <td style="padding:1rem; text-align:center">${data.bookings}</td>
-                <td style="padding:1rem; color:var(--primary); font-weight:700">₹${data.spent.toLocaleString()}</td>
-                <td style="padding:1rem"><span style="background:var(--glass-border); padding:3px 8px; border-radius:4px; font-size:0.7rem">${data.spent > 50000 ? '💎 VIP' : '⭐ Explorer'}</span></td>
+                <td data-label="Name" style="padding:1rem; font-weight:600">${data.name}</td>
+                <td data-label="Email" style="padding:1rem; color:var(--text-muted)">${email}</td>
+                <td data-label="Bookings" style="padding:1rem; text-align:center">${data.bookings}</td>
+                <td data-label="Spent" style="padding:1rem; color:var(--primary); font-weight:700">₹${data.spent.toLocaleString()}</td>
+                <td data-label="Rank" style="padding:1rem"><span style="background:var(--glass-border); padding:3px 8px; border-radius:4px; font-size:0.7rem">${data.spent > 50000 ? '💎 VIP' : '⭐ Explorer'}</span></td>
             </tr>
         `).join('');
     }
