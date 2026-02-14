@@ -1,24 +1,48 @@
-// Storage Engine (Simulating a JSON DB using LocalStorage)
+// Supabase Configuration
+const SUPABASE_URL = 'https://rzqxnlqnridawazapbgw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6cXhubHFucmlkYXdhemFwYmd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwNDkxMTQsImV4cCI6MjA4NjYyNTExNH0.uLe9bUpeRc6yXPMiQKdud63DFaA5S92yDObaK3lM1oM';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Storage Engine (Now using Supabase Cloud DB)
 const DB = {
-    init() {
-        if (!localStorage.getItem('tms_users')) {
-            localStorage.setItem('tms_users', JSON.stringify([
-                { id: 1, name: 'Admin', email: 'admin@tms.com', password: 'admin', role: 'admin' },
-                { id: 2, name: 'Guest', email: 'user@tms.com', password: 'user', role: 'user' }
-            ]));
-        }
-        if (!localStorage.getItem('tms_bookings')) {
-            localStorage.setItem('tms_bookings', JSON.stringify([]));
-        }
+    async getUsers() {
+        const { data, error } = await supabase.from('users').select('*');
+        if (error) { console.error('Error fetching users:', error); return []; }
+        return data;
     },
-    getUsers() { return JSON.parse(localStorage.getItem('tms_users')); },
-    getBookings() { return JSON.parse(localStorage.getItem('tms_bookings')); },
-    saveBooking(booking) {
-        const bookings = this.getBookings();
-        booking.id = Date.now();
-        booking.date = new Date().toLocaleDateString();
-        bookings.push(booking);
-        localStorage.setItem('tms_bookings', JSON.stringify(bookings));
+    async getBookings() {
+        const { data, error } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
+        if (error) { console.error('Error fetching bookings:', error); return []; }
+        return data;
+    },
+    async saveBooking(booking) {
+        const { data, error } = await supabase.from('bookings').insert([{
+            user_id: booking.userId,
+            user_name: booking.userName,
+            dest: booking.selections.dest,
+            flight: booking.selections.flight,
+            ride: booking.selections.ride,
+            hotel: booking.selections.hotel,
+            food: booking.selections.food,
+            guide: booking.selections.guide,
+            total_price: booking.totalPrice,
+            status: 'Pending'
+        }]).select();
+        if (error) { console.error('Error saving booking:', error); return null; }
+        return data[0];
+    },
+    async createUser(user) {
+        const { data, error } = await supabase.from('users').insert([user]).select();
+        if (error) { console.error('Error creating user:', error); return null; }
+        return data[0];
+    },
+    async deleteBooking(id) {
+        const { error } = await supabase.from('bookings').delete().eq('id', id);
+        if (error) console.error('Error deleting booking:', error);
+    },
+    async updateBookingStatus(id, status) {
+        const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
+        if (error) console.error('Error updating booking status:', error);
     }
 };
 
@@ -62,8 +86,7 @@ const signupForm = document.getElementById('signup-form');
 const authLinkContainer = document.getElementById('auth-link-container');
 
 // Initialization
-document.addEventListener('DOMContentLoaded', () => {
-    DB.init();
+document.addEventListener('DOMContentLoaded', async () => {
     updateUIForAuth();
 
     // Register Service Worker for PWA
@@ -209,12 +232,12 @@ function updateUIForAuth() {
     }
 }
 
-function handleLogin(e) {
+async function handleLogin(e) {
     e.preventDefault();
     const email = loginForm.querySelector('input[type="email"]').value;
     const password = loginForm.querySelector('input[type="password"]').value;
 
-    const users = DB.getUsers();
+    const users = await DB.getUsers();
     const user = users.find(u => u.email === email && u.password === password);
 
     if (user) {
@@ -232,23 +255,26 @@ function handleLogin(e) {
     }
 }
 
-function handleSignup(e) {
+async function handleSignup(e) {
     e.preventDefault();
     const name = signupForm.querySelector('input[type="text"]').value;
     const email = signupForm.querySelector('input[type="email"]').value;
     const password = signupForm.querySelector('input[type="password"]').value;
 
-    const users = DB.getUsers();
+    const users = await DB.getUsers();
     if (users.find(u => u.email === email)) {
         alert('Email already exists');
         return;
     }
 
-    const newUser = { id: Date.now(), name, email, password, role: 'user' };
-    users.push(newUser);
-    localStorage.setItem('tms_users', JSON.stringify(users));
-    alert('Account created! Please login.');
-    authTabs[0].click();
+    const newUser = { name, email, password, role: 'user' };
+    const result = await DB.createUser(newUser);
+    if (result) {
+        alert('Account created! Please login.');
+        authTabs[0].click();
+    } else {
+        alert('Failed to create account. Please try again.');
+    }
 }
 
 function logout() {
@@ -295,7 +321,7 @@ function updateBreakdownUI() {
     if (serviceTaxEl) serviceTaxEl.innerText = `₹${state.booking.serviceTax.toFixed(2)}`;
 }
 
-function handleBooking() {
+async function handleBooking() {
     if (!state.currentUser) {
         alert('Please login to book tickets!');
         authModal.classList.remove('hidden');
@@ -310,25 +336,30 @@ function handleBooking() {
         totalPrice: state.booking.total
     };
 
-    DB.saveBooking(bookingData);
-    alert('Booking Successful! Generating your bill...');
-    showBillModal(bookingData);
+    const result = await DB.saveBooking(bookingData);
+    if (result) {
+        alert('Booking Successful! Generating your bill...');
+        showBillModal(result);
+    } else {
+        alert('Failed to save booking. Please try again.');
+    }
 }
 
 function showBillModal(data) {
     const billModal = document.getElementById('bill-modal');
 
     document.getElementById('bill-details').innerHTML = `
-        <div style="display: flex; justify-content: space-between;"><strong>Customer:</strong> <span>${data.userName}</span></div>
-        <div style="display: flex; justify-content: space-between;"><span>Destination:</span> <span>${cleanDisplay(data.selections.dest)}</span></div>
-        <div style="display: flex; justify-content: space-between;"><span>Flight:</span> <span>${cleanDisplay(data.selections.flight)}</span></div>
-        <div style="display: flex; justify-content: space-between;"><span>Ride:</span> <span>${cleanDisplay(data.selections.ride)}</span></div>
-        <div style="display: flex; justify-content: space-between;"><span>Hotel:</span> <span>${cleanDisplay(data.selections.hotel)}</span></div>
-        <div style="display: flex; justify-content: space-between;"><span>Food:</span> <span>${cleanDisplay(data.selections.food)}</span></div>
-        <div style="display: flex; justify-content: space-between;"><span>Guide:</span> <span>${cleanDisplay(data.selections.guide)}</span></div>
+        <div style="display: flex; justify-content: space-between;"><strong>Booking ID:</strong> <span>#${data.id.toString().slice(-4)}</span></div>
+        <div style="display: flex; justify-content: space-between;"><strong>Customer:</strong> <span>${data.user_name}</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Destination:</span> <span>${cleanDisplay(data.dest)}</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Flight:</span> <span>${cleanDisplay(data.flight)}</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Ride:</span> <span>${cleanDisplay(data.ride)}</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Hotel:</span> <span>${cleanDisplay(data.hotel)}</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Food:</span> <span>${cleanDisplay(data.food)}</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Guide:</span> <span>${cleanDisplay(data.guide)}</span></div>
     `;
 
-    document.getElementById('bill-total').innerText = `₹${data.billing.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    document.getElementById('bill-total').innerText = `₹${parseFloat(data.total_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
     billModal.classList.remove('hidden');
     gsap.from(billModal.querySelector('.modal-content'), { duration: 0.5, scale: 0.9, opacity: 0, ease: "back.out" });
@@ -399,50 +430,77 @@ function toggleAdminPanel(show) {
         aboutSection?.classList.remove('hidden');
     }
 }
-function renderAdminDashboard() {
+async function renderAdminDashboard() {
     document.getElementById('booking').classList.add('hidden');
     document.getElementById('about').classList.add('hidden');
     const adminSection = document.getElementById('admin-section');
     adminSection.classList.remove('hidden');
 
-    const bookings = DB.getBookings();
+    const bookings = await DB.getBookings();
+    const users = await DB.getUsers();
+
+    // Stats
+    const totalRevenue = bookings.reduce((sum, b) => sum + parseFloat(b.total_price), 0);
+    const confirmedCount = bookings.filter(b => b.status === 'Confirmed').length;
+
+    const statsHTML = `
+        <div class="admin-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Total Users</h4>
+                <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">${users.length}</div>
+            </div>
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Total Bookings</h4>
+                <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">${bookings.length}</div>
+            </div>
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Revenue</h4>
+                <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">₹${totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+            </div>
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Confirmed</h4>
+                <div style="font-size: 2rem; font-weight: 800; color: #10b981;">${confirmedCount}</div>
+            </div>
+        </div>
+    `;
+
+    const existingStats = adminSection.querySelector('.admin-stats');
+    if (existingStats) existingStats.remove();
+    adminSection.querySelector('.section-header').insertAdjacentHTML('afterend', statsHTML);
+
     const tbody = document.getElementById('bookings-tbody');
     tbody.innerHTML = bookings.length === 0 ? '<tr><td colspan="6" style="text-align:center; padding: 3rem; color: var(--text-muted);">No bookings found.</td></tr>' : bookings.map(b => `
         <tr style="border-bottom: 1px solid var(--glass-border);">
             <td style="padding: 1.5rem;">#${b.id.toString().slice(-4)}</td>
-            <td style="padding: 1.5rem; font-weight: 600;">${b.userName}</td>
+            <td style="padding: 1.5rem; font-weight: 600;">${b.user_name}</td>
             <td style="padding: 1.5rem; color: var(--text-muted); font-size: 0.85rem;">
-                ${cleanDisplay(b.selections.dest)} | ${cleanDisplay(b.selections.flight)} | ${cleanDisplay(b.selections.ride)}
+                ${cleanDisplay(b.dest)} | ${cleanDisplay(b.flight)} | ${cleanDisplay(b.ride)}
             </td>
-            <td style="padding: 1.5rem; color: var(--primary); font-weight: 800;">₹${b.totalPrice.toFixed(2)}</td>
+            <td style="padding: 1.5rem; color: var(--primary); font-weight: 800;">₹${parseFloat(b.total_price).toFixed(2)}</td>
             <td style="padding: 1.5rem;">
                 <span style="background: ${b.status === 'Confirmed' ? '#10b98122' : '#f59e0b22'}; color: ${b.status === 'Confirmed' ? '#10b981' : '#f59e0b'}; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 700;">
                     ${b.status || 'Pending'}
                 </span>
             </td>
             <td style="padding: 1.5rem; display: flex; gap: 0.5rem;">
-                <button onclick="updateBookingStatus(${b.id})" class="btn-primary" style="padding: 0.5rem 0.8rem; font-size: 0.75rem;">Verify</button>
-                <button onclick="deleteBooking(${b.id})" class="btn-outline" style="padding: 0.5rem 0.8rem; font-size: 0.75rem; border-color: var(--primary); color: var(--primary);">Cancel</button>
+                <button onclick="updateBookingStatus('${b.id}', '${b.status}')" class="btn-primary" style="padding: 0.5rem 0.8rem; font-size: 0.75rem;">${b.status === 'Confirmed' ? 'Unverify' : 'Verify'}</button>
+                <button onclick="deleteBooking('${b.id}')" class="btn-outline" style="padding: 0.5rem 0.8rem; font-size: 0.75rem; border-color: var(--primary); color: var(--primary);">Cancel</button>
             </td>
         </tr>
     `).join('');
 }
 
-window.updateBookingStatus = function (id) {
-    let bookings = DB.getBookings();
-    const index = bookings.findIndex(b => b.id === id);
-    if (index !== -1) {
-        bookings[index].status = bookings[index].status === 'Confirmed' ? 'Pending' : 'Confirmed';
-        localStorage.setItem('tms_bookings', JSON.stringify(bookings));
-        renderAdminDashboard();
-    }
+window.updateBookingStatus = async function (id, currentStatus) {
+    const newStatus = currentStatus === 'Confirmed' ? 'Pending' : 'Confirmed';
+    await DB.updateBookingStatus(id, newStatus);
+    renderAdminDashboard();
 };
 
-window.deleteBooking = function (id) {
-    let bookings = DB.getBookings();
-    bookings = bookings.filter(b => b.id !== id);
-    localStorage.setItem('tms_bookings', JSON.stringify(bookings));
-    renderAdminDashboard();
+window.deleteBooking = async function (id) {
+    if (confirm('Are you sure you want to cancel this booking?')) {
+        await DB.deleteBooking(id);
+        renderAdminDashboard();
+    }
 };
 
 function animateValue(obj, end) {
