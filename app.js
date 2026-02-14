@@ -6,11 +6,17 @@ const SUPABASE_URL = 'https://rzqxnlqnridawazapbgw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6cXhubHFucmlkYXdhemFwYmd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwNDkxMTQsImV4cCI6MjA4NjYyNTExNH0.uLe9bUpeRc6yXPMiQKdud63DFaA5S92yDObaK3lM1oM';
 let supabase = null;
 
-try {
-    if (window.supabase) {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Supabase Initialization Logic
+function initSupabase() {
+    try {
+        if (window.supabase && !supabase) {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            console.log("☁️ Supabase Cloud Initialized");
+        }
+    } catch (e) {
+        console.warn("Supabase init failed. Retrying...");
     }
-} catch (e) { console.warn('Supabase not available yet.'); }
+}
 
 // Storage Engine (The "OG" Local Engine)
 const DB = {
@@ -117,6 +123,7 @@ const cleanDisplay = (val) => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    initSupabase();
     DB.init();
     updateUIForAuth();
     setupEventListeners();
