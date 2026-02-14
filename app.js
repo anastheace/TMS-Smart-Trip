@@ -394,18 +394,11 @@ window.confirmBookingPayment = function () {
 
     setTimeout(() => {
         btn.innerText = 'Redirecting...';
-        setTimeout(() => {
+        setTimeout(async () => {
             document.getElementById('payment-modal').classList.add('hidden');
             alert('Success! Your payment has been confirmed and trip is booked.');
 
-            // Mark last booking as confirmed in DB
-            const bookings = DB.getBookings();
-            if (bookings.length > 0) {
-                bookings[bookings.length - 1].status = 'Confirmed';
-                localStorage.setItem('tms_bookings', JSON.stringify(bookings));
-            }
-
-            // Reset UI
+            // Refresh UI
             window.location.hash = '#home';
             window.location.reload();
         }, 1500);

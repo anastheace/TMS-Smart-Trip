@@ -231,26 +231,61 @@
         </main>
 
         <!-- Admin Dashboard (Consolidated) -->
-        <section id="admin-section" class="app-container hidden"
-            style="padding: 100px 2rem; max-width: 1400px; margin: 0 auto;">
-            <div class="section-header">
-                <h2>Admin <span class="accent-text">Control Center</span></h2>
-                <div class="underline"></div>
-            </div>
-            <div class="glass-card" style="padding: 3rem; margin-top: 3rem; overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="border-bottom: 2px solid var(--primary); text-align: left;">
-                            <th style="padding: 1.5rem;">ID</th>
-                            <th style="padding: 1.5rem;">Customer</th>
-                            <th style="padding: 1.5rem;">Trip Package</th>
-                            <th style="padding: 1.5rem;">Total</th>
-                            <th style="padding: 1.5rem;">Status</th>
-                            <th style="padding: 1.5rem;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="bookings-tbody"></tbody>
-                </table>
+        <section id="admin-section" class="hidden"
+            style="padding: 100px 5%; min-height: 100vh; background: radial-gradient(circle at top right, #ff4d4d0a, transparent);">
+            <div class="app-container" style="max-width: 1400px; margin: 0 auto;">
+                <div class="section-header" style="text-align: center; margin-bottom: 3rem;">
+                    <p class="accent-text" style="font-size: 0.9rem; letter-spacing: 4px; font-weight: 700;">
+                        ADMINISTRATION</p>
+                    <h2 style="font-size: 2.5rem; font-weight: 900; color: var(--text-main);">Control Center</h2>
+                </div>
+
+                <div class="admin-tabs" style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 2rem;">
+                    <button class="btn-primary admin-tab active" onclick="switchAdminTab('bookings')">Bookings</button>
+                    <button class="btn-outline admin-tab" onclick="switchAdminTab('users')"
+                        style="border-color: var(--primary); color: var(--primary);">Users</button>
+                </div>
+
+                <div id="admin-bookings-tab" class="admin-tab-content">
+                    <div class="glass-card" style="padding: 2rem; overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                            <thead>
+                                <tr
+                                    style="border-bottom: 2px solid var(--glass-border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;">
+                                    <th style="padding: 1rem;">ID</th>
+                                    <th style="padding: 1rem;">Customer</th>
+                                    <th style="padding: 1rem;">Trip Details</th>
+                                    <th style="padding: 1rem;">Amount</th>
+                                    <th style="padding: 1rem;">Status</th>
+                                    <th style="padding: 1rem;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bookings-tbody">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="admin-users-tab" class="admin-tab-content hidden">
+                    <div class="glass-card" style="padding: 2rem; overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                            <thead>
+                                <tr
+                                    style="border-bottom: 2px solid var(--glass-border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;">
+                                    <th style="padding: 1rem;">Name</th>
+                                    <th style="padding: 1rem;">Email</th>
+                                    <th style="padding: 1rem;">Role</th>
+                                    <th style="padding: 1rem;">Joined</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-tbody">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div style="text-align: center; margin-top: 3rem;">
                     <button onclick="toggleAdminPanel(false)" class="btn-outline">Return to Front End</button>
                 </div>
