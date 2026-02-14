@@ -258,7 +258,7 @@ function handleBooking() {
     showBillModal(booking);
 }
 
-window.showBillModal = function (data) {
+window.showBillModal = function (data, isAdminView = false) {
     const modal = document.getElementById('bill-modal');
     const details = document.getElementById('bill-details');
     if (!data) return;
@@ -280,6 +280,23 @@ window.showBillModal = function (data) {
             </div>
         `;
     }
+
+    const actions = document.getElementById('bill-modal-actions');
+    if (actions) {
+        if (isAdminView) {
+            actions.innerHTML = `
+                <button class="btn-outline" style="min-width: 150px; border-radius: 50px;"
+                    onclick="document.getElementById('bill-modal').classList.add('hidden')">Close Invoice</button>
+            `;
+        } else {
+            actions.innerHTML = `
+                <button class="btn-outline" style="flex: 1;"
+                    onclick="document.getElementById('bill-modal').classList.add('hidden')">Back</button>
+                <button class="btn-primary" style="flex: 2;" onclick="proceedToPaymentFromBill()">Proceed to Payment</button>
+            `;
+        }
+    }
+
     const total = document.getElementById('bill-total');
     if (total) {
         const curr = { val: 0 };
@@ -295,7 +312,7 @@ window.showBillModal = function (data) {
 
 window.showBookingDetails = (id) => {
     const booking = DB.getBookings().find(b => String(b.id) === String(id));
-    if (booking) window.showBillModal(booking);
+    if (booking) window.showBillModal(booking, true);
     else console.warn('Booking not found for ID:', id);
 };
 
