@@ -112,7 +112,7 @@ const state = {
 
 // UI Helpers
 const cleanDisplay = (val) => {
-    if (!val || val === 'none') return '-';
+    if (!val || val === 'none') return 'STANDARD';
     return val.includes('_') ? val.split('_').slice(1).join(' ').toUpperCase() : val.toUpperCase();
 };
 
@@ -258,22 +258,25 @@ function handleBooking() {
     showBillModal(booking);
 }
 
-function showBillModal(data) {
+window.showBillModal = function (data) {
     const modal = document.getElementById('bill-modal');
     const details = document.getElementById('bill-details');
+    if (!data) return;
+
+    const bId = String(data.id || '0000').slice(-4);
     if (details) {
         details.innerHTML = `
             <div style="margin-bottom: 1.5rem; background: var(--glass-border); padding: 1rem; border-radius: 12px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem"><strong style="color:var(--primary)">ID:</strong><span>#${data.id.slice(-4)}</span></div>
-                <div style="display:flex;justify-content:space-between"><strong style="color:var(--text-muted)">Customer:</strong><span>${data.userName}</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem"><strong style="color:var(--primary)">ID:</strong><span>#${bId}</span></div>
+                <div style="display:flex;justify-content:space-between"><strong style="color:var(--text-muted)">Customer:</strong><span>${data.userName || 'Guest'}</span></div>
             </div>
             <div style="display: grid; gap: 0.8rem; font-size: 0.9rem;">
-                <div style="display:flex;justify-content:space-between"><span>Destination:</span><span style="font-weight:600">${cleanDisplay(data.selections.dest)}</span></div>
-                <div style="display:flex;justify-content:space-between"><span>Flight Class:</span><span style="font-weight:600">${cleanDisplay(data.selections.flight)}</span></div>
-                <div style="display:flex;justify-content:space-between"><span>Stay Type:</span><span style="font-weight:600">${cleanDisplay(data.selections.hotel)}</span></div>
-                <div style="display:flex;justify-content:space-between"><span>Food Package:</span><span style="font-weight:600">${cleanDisplay(data.selections.food)}</span></div>
-                <div style="display:flex;justify-content:space-between"><span>Guide:</span><span style="font-weight:600">${cleanDisplay(data.selections.guide)}</span></div>
-                <div style="display:flex;justify-content:space-between"><span>Transport:</span><span style="font-weight:600">${cleanDisplay(data.selections.ride)}</span></div>
+                <div style="display:flex;justify-content:space-between"><span>Destination:</span><span style="font-weight:600">${cleanDisplay(data.selections?.dest)}</span></div>
+                <div style="display:flex;justify-content:space-between"><span>Flight Class:</span><span style="font-weight:600">${cleanDisplay(data.selections?.flight)}</span></div>
+                <div style="display:flex;justify-content:space-between"><span>Stay Type:</span><span style="font-weight:600">${cleanDisplay(data.selections?.hotel)}</span></div>
+                <div style="display:flex;justify-content:space-between"><span>Food Package:</span><span style="font-weight:600">${cleanDisplay(data.selections?.food)}</span></div>
+                <div style="display:flex;justify-content:space-between"><span>Guide:</span><span style="font-weight:600">${cleanDisplay(data.selections?.guide)}</span></div>
+                <div style="display:flex;justify-content:space-between"><span>Transport:</span><span style="font-weight:600">${cleanDisplay(data.selections?.ride)}</span></div>
             </div>
         `;
     }
@@ -281,18 +284,19 @@ function showBillModal(data) {
     if (total) {
         const curr = { val: 0 };
         gsap.to(curr, {
-            val: data.totalPrice || data.total || 0,
+            val: parseFloat(data.totalPrice) || parseFloat(data.total) || 0,
             duration: 1.2,
             ease: "power2.out",
             onUpdate: () => total.innerText = `₹${curr.val.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
         });
     }
     modal?.classList.remove('hidden');
-}
+};
 
 window.showBookingDetails = (id) => {
-    const booking = DB.getBookings().find(b => b.id === id);
-    if (booking) showBillModal(booking);
+    const booking = DB.getBookings().find(b => String(b.id) === String(id));
+    if (booking) window.showBillModal(booking);
+    else console.warn('Booking not found for ID:', id);
 };
 
 window.proceedToPaymentFromBill = () => {
