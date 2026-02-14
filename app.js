@@ -239,7 +239,7 @@ function updatePrices() {
     const sTax = subtotal * 0.02;
     state.booking = { subtotal, gst, sTax, total: subtotal + gst + sTax };
 
-    document.getElementById('overall-price').innerText = `₹${state.booking.total.toLocaleString('en-IN')}`;
+    animateValue(document.getElementById('overall-price'), state.booking.total);
     document.getElementById('subtotal-val').innerText = `₹${subtotal.toFixed(2)}`;
     document.getElementById('gst-val').innerText = `₹${gst.toFixed(2)}`;
     document.getElementById('tax-val').innerText = `₹${sTax.toFixed(2)}`;
@@ -260,13 +260,40 @@ function handleBooking() {
 
 function showBillModal(data) {
     const modal = document.getElementById('bill-modal');
-    document.getElementById('bill-details').innerHTML = `
-        <div style="display:flex;justify-content:space-between"><strong>ID:</strong><span>#${data.id.slice(-4)}</span></div>
-        <div style="display:flex;justify-content:space-between"><strong>Dest:</strong><span>${cleanDisplay(data.selections.dest)}</span></div>
-    `;
-    document.getElementById('bill-total').innerText = `₹${data.totalPrice.toLocaleString('en-IN')}`;
-    modal.classList.remove('hidden');
+    const details = document.getElementById('bill-details');
+    if (details) {
+        details.innerHTML = `
+            <div style="margin-bottom: 1.5rem; background: var(--glass-border); padding: 1rem; border-radius: 12px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem"><strong style="color:var(--primary)">ID:</strong><span>#${data.id.slice(-4)}</span></div>
+                <div style="display:flex;justify-content:space-between"><strong style="color:var(--text-muted)">Customer:</strong><span>${data.userName}</span></div>
+            </div>
+            <div style="display: grid; gap: 0.8rem; font-size: 0.9rem;">
+                <div style="display:flex;justify-content:space-between"><span>Destination:</span><span style="font-weight:600">${cleanDisplay(data.selections.dest)}</span></div>
+                <div style="display:flex;justify-content:space-between"><span>Flight Class:</span><span style="font-weight:600">${cleanDisplay(data.selections.flight)}</span></div>
+                <div style="display:flex;justify-content:space-between"><span>Stay Type:</span><span style="font-weight:600">${cleanDisplay(data.selections.hotel)}</span></div>
+                <div style="display:flex;justify-content:space-between"><span>Food Package:</span><span style="font-weight:600">${cleanDisplay(data.selections.food)}</span></div>
+                <div style="display:flex;justify-content:space-between"><span>Guide:</span><span style="font-weight:600">${cleanDisplay(data.selections.guide)}</span></div>
+                <div style="display:flex;justify-content:space-between"><span>Transport:</span><span style="font-weight:600">${cleanDisplay(data.selections.ride)}</span></div>
+            </div>
+        `;
+    }
+    const total = document.getElementById('bill-total');
+    if (total) {
+        const curr = { val: 0 };
+        gsap.to(curr, {
+            val: data.totalPrice || data.total || 0,
+            duration: 1.2,
+            ease: "power2.out",
+            onUpdate: () => total.innerText = `₹${curr.val.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+        });
+    }
+    modal?.classList.remove('hidden');
 }
+
+window.showBookingDetails = (id) => {
+    const booking = DB.getBookings().find(b => b.id === id);
+    if (booking) showBillModal(booking);
+};
 
 window.proceedToPaymentFromBill = () => {
     document.getElementById('bill-modal').classList.add('hidden');
@@ -321,19 +348,50 @@ function renderAdminDashboard() {
     if (existingStats) existingStats.remove();
     adminSec.querySelector('.section-header').insertAdjacentHTML('afterend', statsHTML);
 
-    document.getElementById('bookings-tbody').innerHTML = bookings.length === 0 ? '<tr><td colspan="6" style="text-align:center;padding:2rem">Local storage is empty</td></tr>' : bookings.map(b => `
+    document.getElementById('bookings-tbody').innerHTML = bookings.length === 0 ? '<tr><td colspan="7" style="text-align:center;padding:2rem">Local storage is empty</td></tr>' : bookings.map(b => `
         <tr style="border-bottom:1px solid var(--glass-border)">
             <td style="padding:1rem">#${b.id.slice(-4)}</td>
-            <td style="padding:1rem">${b.userName}</td>
+            <td style="padding:1rem; font-weight:600">${b.userName}</td>
             <td style="padding:1rem">${cleanDisplay(b.selections.dest)}</td>
-            <td style="padding:1rem">₹${b.totalPrice.toFixed(0)}</td>
-            <td style="padding:1rem">${b.status}</td>
-            <td style="padding:1rem;font-size:0.7rem">${b.synced ? '✅ Synced' : '⏳ Pending'}</td>
+            <td style="padding:1rem; color:var(--primary); font-weight:700">₹${(b.totalPrice || b.total).toLocaleString()}</td>
+            <td style="padding:1rem"><span style="background:var(--primary)22; color:var(--primary); padding:3px 10px; border-radius:10px; font-size:0.75rem">${b.status}</span></td>
+            <td style="padding:1rem; font-size:0.7rem">${b.synced ? '✅' : '⏳'}</td>
+            <td style="padding:1rem">
+                <button onclick="showBookingDetails('${b.id}')" class="btn-outline" style="padding:4px 8px; font-size:0.7rem; border-color:var(--primary); color:var(--primary)">View Details</button>
+            </td>
         </tr>
     `).join('');
+
+    const uTbody = document.getElementById('users-tbody');
+    if (uTbody) {
+        uTbody.innerHTML = users.length === 0 ? '<tr><td colspan="3" style="text-align:center;padding:2rem">No users found</td></tr>' : users.map(u => `
+            <tr style="border-bottom:1px solid var(--glass-border)">
+                <td style="padding:1rem; font-weight:600">${u.name}</td>
+                <td style="padding:1rem; color:var(--text-muted)">${u.email}</td>
+                <td style="padding:1rem"><span style="background:var(--glass-border); padding:3px 8px; border-radius:4px; font-size:0.7rem">${u.role}</span></td>
+            </tr>
+        `).join('');
+    }
 }
 
 window.switchAdminTab = (name) => {
     document.getElementById('admin-bookings-tab').classList.toggle('hidden', name !== 'bookings');
     document.getElementById('admin-users-tab').classList.toggle('hidden', name !== 'users');
 };
+
+function animateValue(obj, end) {
+    if (!obj) return;
+    const start = parseFloat(obj.innerText.replace(/[₹,]/g, '')) || 0;
+    const curr = { val: start };
+    gsap.to(curr, {
+        val: end,
+        duration: 1.5,
+        ease: "expo.out",
+        onUpdate: () => {
+            obj.innerText = `₹${curr.val.toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            })}`;
+        }
+    });
+}
