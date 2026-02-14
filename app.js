@@ -1,23 +1,3 @@
-// TMS Smart Trip - Core Logic (v3.0 Shadow Sync Edition)
-// Priorities: 1. OG Stability (LocalStorage) 2. Silent Cloud Backup 3. Admin Tools
-
-// Supabase Configuration
-const SUPABASE_URL = 'https://rzqxnlqnridawazapbgw.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6cXhubHFucmlkYXdhemFwYmd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwNDkxMTQsImV4cCI6MjA4NjYyNTExNH0.uLe9bUpeRc6yXPMiQKdud63DFaA5S92yDObaK3lM1oM';
-let supabase = null;
-
-// Supabase Initialization Logic
-function initSupabase() {
-    try {
-        if (window.supabase && !supabase) {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            console.log("☁️ Supabase Cloud Initialized");
-        }
-    } catch (e) {
-        console.warn("Supabase init failed. Retrying...");
-    }
-}
-
 // Storage Engine (The "OG" Local Engine)
 const DB = {
     init() {
@@ -40,64 +20,19 @@ const DB = {
             id: Date.now().toString(),
             date: new Date().toLocaleDateString(),
             ...booking,
-            status: 'Pending',
-            synced: false
+            status: 'Pending'
         };
         bookings.push(newBooking);
         localStorage.setItem('tms_bookings', JSON.stringify(bookings));
-
-        // Silent Background Sync
-        this.silentSyncBooking(newBooking);
         return newBooking;
     },
 
     createUser(user) {
         const users = this.getUsers();
-        const newUser = { id: Date.now().toString(), ...user, synced: false };
+        const newUser = { id: Date.now().toString(), ...user };
         users.push(newUser);
         localStorage.setItem('tms_users', JSON.stringify(users));
-        this.silentSyncUser(newUser);
         return newUser;
-    },
-
-    async silentSyncBooking(booking) {
-        if (!supabase) return;
-        try {
-            const { error } = await supabase.from('bookings').insert([{
-                user_id: booking.userId || 'LOCAL',
-                user_name: booking.userName,
-                dest: booking.selections?.dest || 'none',
-                flight: booking.selections?.flight || 'none',
-                total_price: booking.totalPrice || booking.total || 0,
-                status: booking.status
-            }]);
-            if (!error) {
-                this.markAsSynced(booking.id, 'tms_bookings');
-                console.log('✅ Booking Synced Silently');
-            }
-        } catch (e) { /* Silent fail */ }
-    },
-
-    async silentSyncUser(user) {
-        if (!supabase) return;
-        try {
-            const { error } = await supabase.from('users').insert([{
-                name: user.name,
-                email: user.email,
-                password: user.password,
-                role: user.role
-            }]);
-            if (!error) this.markAsSynced(user.id, 'tms_users');
-        } catch (e) { /* Silent fail */ }
-    },
-
-    markAsSynced(id, key) {
-        const items = JSON.parse(localStorage.getItem(key)) || [];
-        const index = items.findIndex(i => i.id === id);
-        if (index !== -1) {
-            items[index].synced = true;
-            localStorage.setItem(key, JSON.stringify(items));
-        }
     }
 };
 
@@ -123,7 +58,6 @@ const cleanDisplay = (val) => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    initSupabase();
     DB.init();
     updateUIForAuth();
     setupEventListeners();
@@ -367,7 +301,6 @@ function renderAdminDashboard() {
 
     // 1. Render Dashboard Stats & Visuals
     const totalRev = bookings.reduce((s, b) => s + (parseFloat(b.totalPrice) || parseFloat(b.total) || 0), 0);
-    const syncedCount = bookings.filter(b => b.synced).length;
 
     const statsContainer = document.getElementById('admin-stats-container');
     if (statsContainer) {
@@ -383,10 +316,6 @@ function renderAdminDashboard() {
             <div class="glass-card" style="padding:1.5rem; text-align:center; border-left: 4px solid #60a5fa">
                 <h5 style="color:var(--text-muted); font-size:0.7rem; letter-spacing:1px; margin-bottom:0.5rem">ACTIVE USERS</h5>
                 <div style="font-size:1.8rem; font-weight:800; color:#60a5fa">${users.length}</div>
-            </div>
-            <div class="glass-card" style="padding:1.5rem; text-align:center; border-left: 4px solid #fbbf24">
-                <h5 style="color:var(--text-muted); font-size:0.7rem; letter-spacing:1px; margin-bottom:0.5rem">CLOUD SYNC</h5>
-                <div style="font-size:1.8rem; font-weight:800; color:#fbbf24">${syncedCount}/${bookings.length}</div>
             </div>
         `;
     }
@@ -440,7 +369,6 @@ function renderAdminDashboard() {
                     <td style="padding:1rem">${cleanDisplay(b.selections?.dest)}</td>
                     <td style="padding:1rem; color:var(--primary); font-weight:700">₹${price.toLocaleString()}</td>
                     <td style="padding:1rem"><span style="background:var(--primary)22; color:var(--primary); padding:3px 10px; border-radius:10px; font-size:0.75rem">${b.status || 'Pending'}</span></td>
-                    <td style="padding:1rem; font-size:1.2rem">${b.synced ? '✅' : '⏳'}</td>
                     <td style="padding:1rem">
                         <button onclick="showBookingDetails('${b.id}')" class="btn-outline" style="padding:4px 12px; font-size:0.7rem; border-color:var(--primary); color:var(--primary)">VIEW BILL</button>
                     </td>
