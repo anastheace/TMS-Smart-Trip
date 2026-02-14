@@ -234,32 +234,47 @@ function updateUIForAuth() {
 
 async function handleLogin(e) {
     e.preventDefault();
+    const btn = loginForm.querySelector('button');
     const email = loginForm.querySelector('input[type="email"]').value;
     const password = loginForm.querySelector('input[type="password"]').value;
 
-    console.log('Attempting login for:', email);
-    const users = await DB.getUsers();
-    console.log('Users found in DB:', users.length);
+    const originalBtnText = btn.innerText;
+    btn.innerText = 'Checking...';
+    btn.disabled = true;
 
-    const user = users.find(u => u.email === email && u.password === password);
+    try {
+        console.log('Attempting login for:', email);
+        const { data: users, error } = await supabase.from('users').select('*');
 
-    if (user) {
-        state.currentUser = user;
-        localStorage.setItem('tms_active_user', JSON.stringify(user));
-        updateUIForAuth();
-        authModal.classList.add('hidden');
-        console.log('Login successful:', user.name, 'Role:', user.role);
-
-        if (user.role?.toLowerCase() === 'admin') {
-            console.log('Admin detected, toggling panel...');
-            toggleAdminPanel(true);
-            alert(`Welcome Admin, ${user.name}!`);
-        } else {
-            alert(`Welcome back, ${user.name}!`);
+        if (error) {
+            console.error('Database Error:', error);
+            alert('Cloud Database Error: ' + error.message);
+            return;
         }
-    } else {
-        console.error('Login failed: Invalid email or password');
-        alert('Invalid email or password. Please check your credentials or ensure the user exists in Supabase.');
+
+        const user = users.find(u => u.email.trim() === email.trim() && u.password === password);
+
+        if (user) {
+            state.currentUser = user;
+            localStorage.setItem('tms_active_user', JSON.stringify(user));
+            updateUIForAuth();
+            authModal.classList.add('hidden');
+
+            if (user.role?.toLowerCase() === 'admin') {
+                toggleAdminPanel(true);
+                alert(`Welcome Admin, ${user.name}!`);
+            } else {
+                alert(`Welcome back, ${user.name}!`);
+            }
+        } else {
+            alert('Invalid email or password. Please check your credentials or ensure the user exists in Supabase SQL Editor.');
+        }
+    } catch (err) {
+        console.error('System Error:', err);
+        alert('System Error: ' + err.message);
+    } finally {
+        btn.innerText = originalBtnText;
+        btn.disabled = false;
     }
 }
 
