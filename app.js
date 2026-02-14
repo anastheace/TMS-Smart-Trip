@@ -1,21 +1,29 @@
-// TMS Smart Trip - Core Logic (v2.5 - Professional Edition)
-// Priorities: 1. Stability 2. UI Aesthetics 3. Cloud Sync
+// TMS Smart Trip - Core Logic (v2.6 - Ultra Stable)
+// Priorities: 1. Zero-Crash Stability 2. Image Resilience 3. Local-First Logic
 
-// Supabase Configuration (Silent Sync)
+// Supabase Configuration (Background Backup)
 const SUPABASE_URL = 'https://rzqxnlqnridawazapbgw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6cXhubHFucmlkYXdhemFwYmd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwNDkxMTQsImV4cCI6MjA4NjYyNTExNH0.uLe9bUpeRc6yXPMiQKdud63DFaA5S92yDObaK3lM1oM';
 let supabase = null;
-if (window.supabase) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+try {
+    if (window.supabase) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+} catch (e) {
+    console.error('Supabase Initialization Failed:', e);
 }
 
-// Storage Engine (Local-First with Silent Cloud Backup)
+// Storage Engine (Local-First Architecture)
 const DB = {
     getUsers() {
-        return JSON.parse(localStorage.getItem('tms_users')) || [];
+        try {
+            return JSON.parse(localStorage.getItem('tms_users')) || [];
+        } catch (e) { return []; }
     },
     getBookings() {
-        return JSON.parse(localStorage.getItem('tms_bookings')) || [];
+        try {
+            return JSON.parse(localStorage.getItem('tms_bookings')) || [];
+        } catch (e) { return []; }
     },
     async saveBooking(booking) {
         const bookings = this.getBookings();
@@ -28,7 +36,7 @@ const DB = {
         bookings.push(newBooking);
         localStorage.setItem('tms_bookings', JSON.stringify(bookings));
 
-        // Silent Cloud Sync
+        // Silent Cloud Backup
         if (supabase) {
             supabase.from('bookings').insert([{
                 user_id: booking.userId,
@@ -37,18 +45,17 @@ const DB = {
                 flight: booking.selections.flight,
                 total_price: booking.totalPrice,
                 status: 'Pending'
-            }]).then(() => console.log('Cloud Sync Success')).catch(e => console.warn('Cloud Sync Failed', e));
+            }]).then(() => console.log('✅ Cloud Backup Success')).catch(() => { });
         }
         return newBooking;
     },
     async createUser(user) {
         const users = this.getUsers();
-        users.push(user);
+        users.push({ ...user, created_at: new Date().toISOString() });
         localStorage.setItem('tms_users', JSON.stringify(users));
 
-        // Silent Cloud Sync
         if (supabase) {
-            supabase.from('users').insert([user]).then(() => console.log('User Sync Success')).catch(e => console.warn('User Sync Failed', e));
+            supabase.from('users').insert([user]).then(() => console.log('✅ User Synced')).catch(() => { });
         }
         return user;
     },
@@ -63,10 +70,16 @@ const DB = {
     deleteBooking(id) {
         const bookings = this.getBookings().filter(b => b.id !== id);
         localStorage.setItem('tms_bookings', JSON.stringify(bookings));
+    },
+    emergencyReset() {
+        if (confirm('CRITICAL: This will clear all local data and reset the app. Continue?')) {
+            localStorage.clear();
+            location.reload();
+        }
     }
 };
 
-// Initial Data: Create Admin if not exists
+// Ensure basic users exist
 if (DB.getUsers().length === 0) {
     DB.createUser({ name: 'Admin', email: 'admin@tms.com', password: 'admin123', role: 'admin' });
 }
@@ -88,8 +101,7 @@ const state = {
 
 const cleanDisplay = (val) => {
     if (!val || val === 'none') return '-';
-    const parts = val.split('_');
-    return (parts.length > 1 ? parts.slice(1).join(' ') : parts[0]).toUpperCase();
+    return val.split('_').pop().toUpperCase();
 };
 
 // DOM Elements
@@ -110,46 +122,39 @@ const signupForm = document.getElementById('signup-form');
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('TMS initialized. Stability Mode active.');
     updateUIForAuth();
     setupEventListeners();
     initGSAP();
 
-    // Force Admin Panel Visibility if needed
-    if (state.currentUser && state.currentUser.role === 'admin') {
+    // Check for admin role case-insensitively
+    if (state.currentUser && state.currentUser.role?.toLowerCase() === 'admin') {
         toggleAdminPanel(true);
     }
 
-    // Refresh layout after animations
-    setTimeout(() => ScrollTrigger.refresh(), 500);
+    // Resilience: Image Error Handler
+    document.querySelectorAll('img').forEach(img => {
+        img.onerror = function () {
+            console.warn('Image failed to load:', this.src);
+            this.src = 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80';
+            this.onerror = null;
+        };
+        // Trigger error for broken cached images
+        if (img.complete && img.naturalHeight === 0) img.onerror();
+    });
+
+    setTimeout(() => ScrollTrigger.refresh(), 1000);
 });
 
 function initGSAP() {
-    gsap.registerPlugin(ScrollTrigger);
-
-    // Hero Animations
-    gsap.from(".hero-content > *", { duration: 1.2, y: 50, opacity: 0, stagger: 0.3, ease: "power4.out" });
-
-    // About Section
-    gsap.from(".about-content", {
-        scrollTrigger: { trigger: "#about", start: "top 80%" },
-        duration: 1, x: -50, opacity: 0, ease: "power3.out"
-    });
-    gsap.from(".about-image", {
-        scrollTrigger: { trigger: "#about", start: "top 80%" },
-        duration: 1, x: 50, opacity: 0, ease: "power3.out"
-    });
-
-    // Booking Section
-    gsap.from(".booking-card", {
-        scrollTrigger: { trigger: ".booking-grid", start: "top 85%" },
-        duration: 0.8, y: 30, opacity: 0, stagger: 0.1, ease: "back.out(1.2)"
-    });
-
-    // Contact Cards
-    gsap.from(".contact-card", {
-        scrollTrigger: { trigger: "#contact", start: "top 90%" },
-        duration: 0.8, scale: 0.9, opacity: 0, stagger: 0.2, ease: "power2.out"
-    });
+    try {
+        gsap.registerPlugin(ScrollTrigger);
+        gsap.from(".hero-content > *", { duration: 1, y: 30, opacity: 0, stagger: 0.2, ease: "power2.out" });
+        gsap.from(".booking-card", {
+            scrollTrigger: { trigger: ".booking-grid", start: "top 90%" },
+            duration: 0.6, y: 20, opacity: 0, stagger: 0.05, ease: "power2.out"
+        });
+    } catch (e) { console.warn('GSAP Animation Error:', e); }
 }
 
 function setupEventListeners() {
@@ -170,50 +175,47 @@ function setupEventListeners() {
             authTabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
             const target = tab.dataset.target;
-            loginForm.classList.toggle('hidden', target !== 'login-form');
-            signupForm.classList.toggle('hidden', target === 'login-form');
+            loginForm?.classList.toggle('hidden', target !== 'login-form');
+            signupForm?.classList.toggle('hidden', target === 'login-form');
         });
     });
 
     loginForm?.addEventListener('submit', handleLogin);
     signupForm?.addEventListener('submit', handleSignup);
-    bookBtn?.addEventListener('click', handleBooking);
+    if (bookBtn) bookBtn.onclick = handleBooking;
 
     // Mobile Menu
     const mobileBtn = document.getElementById('mobile-menu-btn');
     const navLinks = document.getElementById('nav-links');
     mobileBtn?.addEventListener('click', () => {
         mobileBtn.classList.toggle('active');
-        navLinks.classList.toggle('active');
+        navLinks?.classList.toggle('active');
     });
 }
 
 function updateUIForAuth() {
     if (state.currentUser && loginTrigger) {
         loginTrigger.innerHTML = `Logout (${state.currentUser.name})`;
-        loginTrigger.classList.remove('btn-primary');
-        loginTrigger.classList.add('btn-outline');
+        loginTrigger.classList.replace('btn-primary', 'btn-outline');
     } else if (loginTrigger) {
         loginTrigger.innerHTML = 'Login';
-        loginTrigger.classList.add('btn-primary');
-        loginTrigger.classList.remove('btn-outline');
+        loginTrigger.classList.replace('btn-outline', 'btn-primary');
     }
 }
 
 function handleLogin(e) {
     e.preventDefault();
-    const email = loginForm.querySelector('input[type="email"]').value.trim();
+    const email = loginForm.querySelector('input[type="email"]').value.trim().toLowerCase();
     const password = loginForm.querySelector('input[type="password"]').value;
 
-    const users = DB.getUsers();
-    const user = users.find(u => u.email === email && u.password === password);
+    const user = DB.getUsers().find(u => u.email.toLowerCase() === email && u.password === password);
 
     if (user) {
         state.currentUser = user;
         localStorage.setItem('tms_active_user', JSON.stringify(user));
         updateUIForAuth();
         authModal.classList.add('hidden');
-        if (user.role === 'admin') toggleAdminPanel(true);
+        if (user.role?.toLowerCase() === 'admin') toggleAdminPanel(true);
         alert(`Welcome, ${user.name}!`);
     } else {
         alert('Invalid email or password.');
@@ -223,16 +225,16 @@ function handleLogin(e) {
 function handleSignup(e) {
     e.preventDefault();
     const name = signupForm.querySelector('input[type="text"]').value;
-    const email = signupForm.querySelector('input[type="email"]').value;
+    const email = signupForm.querySelector('input[type="email"]').value.toLowerCase();
     const password = signupForm.querySelector('input[type="password"]').value;
 
-    if (DB.getUsers().find(u => u.email === email)) {
-        alert('Email already registered.');
+    if (DB.getUsers().find(u => u.email.toLowerCase() === email)) {
+        alert('Email already exists.');
         return;
     }
 
     DB.createUser({ name, email, password, role: 'user' });
-    alert('Account created! Please login.');
+    alert('Success! Please login.');
     authTabs[0].click();
 }
 
@@ -241,174 +243,164 @@ function logout() {
     localStorage.removeItem('tms_active_user');
     updateUIForAuth();
     toggleAdminPanel(false);
-    alert('Logged out.');
+    location.reload(); // Hard reload for clean state
 }
 
 function updatePrices() {
-    state.selections.dest = destSelect.value;
-    state.selections.flight = flightSelect.value;
-    state.selections.ride = rideSelect.value;
-    state.selections.hotel = hotelSelect.value;
-    state.selections.food = foodSelect.value;
-    state.selections.guide = guideSelect.value;
+    state.selections = {
+        dest: destSelect?.value || 'none',
+        flight: flightSelect?.value || 'none',
+        ride: rideSelect?.value || 'none',
+        hotel: hotelSelect?.value || 'none',
+        food: foodSelect?.value || 'none',
+        guide: guideSelect?.value || 'none'
+    };
 
-    const subtotal = (state.prices[state.selections.dest] || 0) +
-        (state.prices[state.selections.flight] || 0) +
-        (state.prices[state.selections.ride] || 0) +
-        (state.prices[state.selections.hotel] || 0) +
-        (state.prices[state.selections.food] || 0) +
-        (state.prices[state.selections.guide] || 0);
-
+    const subtotal = Object.values(state.selections).reduce((acc, val) => acc + (state.prices[val] || 0), 0);
     const gst = subtotal * 0.05;
     const sTax = subtotal * 0.02;
     state.booking = { subtotal, gst, serviceTax: sTax, total: subtotal + gst + sTax };
 
     animateValue(totalPriceDisplay, state.booking.total);
     updateBreakdownUI();
-    bookBtn.disabled = state.booking.total === 0;
+    if (bookBtn) bookBtn.disabled = state.booking.total === 0;
 }
 
 function updateBreakdownUI() {
-    document.getElementById('subtotal-val').innerText = `₹${state.booking.subtotal.toFixed(2)}`;
-    document.getElementById('gst-val').innerText = `₹${state.booking.gst.toFixed(2)}`;
-    document.getElementById('tax-val').innerText = `₹${state.booking.serviceTax.toFixed(2)}`;
+    const ids = { 'subtotal-val': state.booking.subtotal, 'gst-val': state.booking.gst, 'tax-val': state.booking.serviceTax };
+    Object.entries(ids).forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = `₹${val.toFixed(2)}`;
+    });
 }
 
-async function handleBooking() {
+function handleBooking() {
     if (!state.currentUser) {
-        alert('Please login first.');
+        alert('Please login to book.');
         authModal.classList.remove('hidden');
         return;
     }
 
-    const bookingData = {
+    const data = {
         userId: state.currentUser.id || 'LOCAL',
         userName: state.currentUser.name,
         selections: { ...state.selections },
         totalPrice: state.booking.total
     };
 
-    const res = await DB.saveBooking(bookingData);
-    if (res) {
-        alert('Booking Success!');
-        showBillModal(res);
-    }
+    DB.saveBooking(data).then(res => {
+        if (res) {
+            alert('Booking Saved!');
+            showBillModal(res);
+        }
+    });
 }
 
 function showBillModal(data) {
     const modal = document.getElementById('bill-modal');
-    document.getElementById('bill-details').innerHTML = `
-        <div style="display:flex;justify-content:space-between"><strong>ID:</strong><span>#${data.id.slice(-4)}</span></div>
-        <div style="display:flex;justify-content:space-between"><strong>Destination:</strong><span>${cleanDisplay(data.selections.dest)}</span></div>
-    `;
-    document.getElementById('bill-total').innerText = `₹${data.totalPrice.toFixed(2)}`;
-    modal.classList.remove('hidden');
+    const details = document.getElementById('bill-details');
+    if (details) {
+        details.innerHTML = `
+            <div style="display:flex;justify-content:space-between"><strong>ID:</strong><span>#${data.id.slice(-4)}</span></div>
+            <div style="display:flex;justify-content:space-between"><strong>Customer:</strong><span>${data.userName}</span></div>
+            <div style="display:flex;justify-content:space-between"><strong>Destination:</strong><span>${cleanDisplay(data.selections.dest)}</span></div>
+        `;
+    }
+    const total = document.getElementById('bill-total');
+    if (total) total.innerText = `₹${data.totalPrice.toFixed(2)}`;
+    modal?.classList.remove('hidden');
 }
 
-window.proceedToPaymentFromBill = function () {
-    document.getElementById('bill-modal').classList.add('hidden');
+window.proceedToPaymentFromBill = () => {
+    document.getElementById('bill-modal')?.classList.add('hidden');
     const payModal = document.getElementById('payment-modal');
-    document.getElementById('pay-amount').innerText = `₹${state.booking.total.toFixed(2)}`;
-    payModal.classList.remove('hidden');
+    const payAmt = document.getElementById('pay-amount');
+    if (payAmt) payAmt.innerText = `₹${state.booking.total.toFixed(2)}`;
+    payModal?.classList.remove('hidden');
 };
 
-window.confirmBookingPayment = function () {
+window.confirmBookingPayment = () => {
     const btn = event.target;
-    btn.innerText = 'Verifying...';
+    if (btn) btn.innerText = 'Verifying...';
     setTimeout(() => {
-        alert('Payment Confirmed!');
+        alert('Payment Success! Your trip is locked in.');
         location.reload();
     }, 1500);
 };
 
 function renderAdminDashboard() {
-    const adminSection = document.getElementById('admin-section');
-    adminSection.classList.remove('hidden');
-    document.getElementById('home').classList.add('hidden');
-    document.getElementById('booking').classList.add('hidden');
-    document.getElementById('about').classList.add('hidden');
-    document.getElementById('contact').classList.add('hidden');
+    const adminSec = document.getElementById('admin-section');
+    if (!adminSec) return;
+
+    adminSec.classList.remove('hidden');
+    ['home', 'booking', 'about', 'contact'].forEach(s => document.getElementById(s)?.classList.add('hidden'));
 
     const bookings = DB.getBookings();
     const users = DB.getUsers();
+    const revenue = bookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
 
-    // Stats
-    const totalRev = bookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
     const statsHTML = `
-        <div class="admin-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
-            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
-                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Total Users</h4>
-                <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">${users.length}</div>
-            </div>
-            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
-                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Total Bookings</h4>
-                <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">${bookings.length}</div>
-            </div>
-            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
-                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Revenue</h4>
-                <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">₹${totalRev.toLocaleString('en-IN')}</div>
-            </div>
+        <div class="admin-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem;margin-bottom:2rem">
+            <div class="glass-card" style="padding:1rem;text-align:center"><h4>Users</h4><div style="font-size:1.5rem;color:var(--primary)">${users.length}</div></div>
+            <div class="glass-card" style="padding:1rem;text-align:center"><h4>Bookings</h4><div style="font-size:1.5rem;color:var(--primary)">${bookings.length}</div></div>
+            <div class="glass-card" style="padding:1rem;text-align:center"><h4>Revenue</h4><div style="font-size:1.5rem;color:var(--primary)">₹${revenue.toLocaleString()}</div></div>
         </div>
     `;
 
-    const existingStats = adminSection.querySelector('.admin-stats');
-    if (existingStats) existingStats.remove();
-    adminSection.querySelector('.section-header').insertAdjacentHTML('afterend', statsHTML);
+    const oldStats = adminSec.querySelector('.admin-stats');
+    if (oldStats) oldStats.remove();
+    adminSec.querySelector('.section-header')?.insertAdjacentHTML('afterend', statsHTML);
 
-    // Bookings Table
-    document.getElementById('bookings-tbody').innerHTML = bookings.length === 0 ? '<tr><td colspan="6" style="text-align:center;padding:2rem">No bookings yet.</td></tr>' : bookings.map(b => `
-        <tr style="border-bottom: 1px solid var(--glass-border)">
-            <td style="padding: 1rem">#${b.id.slice(-4)}</td>
-            <td style="padding: 1rem; font-weight: 600">${b.userName}</td>
-            <td style="padding: 1rem; font-size: 0.85rem">${cleanDisplay(b.selections.dest)} | ${cleanDisplay(b.selections.flight)}</td>
-            <td style="padding: 1rem; color: var(--primary); font-weight: 700">₹${b.totalPrice.toFixed(2)}</td>
-            <td style="padding: 1rem"><span style="background:var(--primary)22; color:var(--primary); padding:3px 10px; border-radius:10px; font-size:0.75rem">${b.status}</span></td>
-            <td style="padding: 1rem">
-                <button onclick="DB.updateBookingStatus('${b.id}', 'Confirmed');renderAdminDashboard()" class="btn-primary" style="padding:5px 10px; font-size:0.7rem">Verify</button>
-                <button onclick="DB.deleteBooking('${b.id}');renderAdminDashboard()" class="btn-outline" style="padding:5px 10px; font-size:0.7rem; border-color:var(--primary); color:var(--primary)">Delete</button>
-            </td>
-        </tr>
-    `).join('');
+    const bTbody = document.getElementById('bookings-tbody');
+    if (bTbody) {
+        bTbody.innerHTML = bookings.length === 0 ? '<tr><td colspan="6" style="padding:2rem;text-align:center">No bookings yet</td></tr>' : bookings.map(b => `
+            <tr style="border-bottom:1px solid var(--glass-border)">
+                <td style="padding:1rem">#${b.id.slice(-4)}</td>
+                <td style="padding:1rem">${b.userName}</td>
+                <td style="padding:1rem;font-size:0.8rem">${cleanDisplay(b.selections.dest)}</td>
+                <td style="padding:1rem;color:var(--primary)">₹${b.totalPrice.toFixed(0)}</td>
+                <td style="padding:1rem"><span style="background:var(--primary)11;color:var(--primary);padding:3px 8px;border-radius:10px">${b.status}</span></td>
+                <td style="padding:1rem">
+                    <button onclick="DB.deleteBooking('${b.id}');renderAdminDashboard()" style="color:var(--primary);background:none;border:1px solid var(--primary);padding:3px 8px;border-radius:4px;cursor:pointer">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    }
 
-    // Users Table
-    document.getElementById('users-tbody').innerHTML = users.map(u => `
-        <tr style="border-bottom: 1px solid var(--glass-border)">
-            <td style="padding: 1rem; font-weight: 600">${u.name}</td>
-            <td style="padding: 1rem; color: var(--text-muted)">${u.email}</td>
-            <td style="padding: 1rem"><span style="background: ${u.role === 'admin' ? '#ef444422' : '#var(--glass-border)'}; color: ${u.role === 'admin' ? '#ef4444' : 'var(--text-muted)'}; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem;">${u.role || 'User'}</span></td>
-            <td style="padding: 1rem; font-size: 0.8rem; color: var(--text-muted)">${new Date(u.created_at || Date.now()).toLocaleDateString()}</td>
-        </tr>
-    `).join('');
+    const uTbody = document.getElementById('users-tbody');
+    if (uTbody) {
+        uTbody.innerHTML = users.map(u => `
+            <tr style="border-bottom:1px solid var(--glass-border)">
+                <td style="padding:1rem">${u.name}</td>
+                <td style="padding:1rem;color:var(--text-muted)">${u.email}</td>
+                <td style="padding:1rem">${u.role}</td>
+                <td style="padding:1rem">${new Date(u.created_at || Date.now()).toLocaleDateString()}</td>
+            </tr>
+        `).join('');
+    }
 }
 
-window.switchAdminTab = function (tabName) {
+window.switchAdminTab = (name) => {
     const tabs = document.querySelectorAll('.admin-tab');
-    tabs.forEach(t => {
-        const isActive = t.innerText.toLowerCase() === tabName.toLowerCase();
-        t.classList.toggle('active', isActive);
-        t.classList.toggle('btn-primary', isActive);
-        t.classList.toggle('btn-outline', !isActive);
-    });
-    document.getElementById('admin-bookings-tab').classList.toggle('hidden', tabName !== 'bookings');
-    document.getElementById('admin-users-tab').classList.toggle('hidden', tabName !== 'users');
+    tabs.forEach(t => t.classList.toggle('active', t.innerText.toLowerCase() === name.toLowerCase()));
+    document.getElementById('admin-bookings-tab')?.classList.toggle('hidden', name !== 'bookings');
+    document.getElementById('admin-users-tab')?.classList.toggle('hidden', name !== 'users');
 };
 
 const toggleAdminPanel = (show) => {
     const adminSec = document.getElementById('admin-section');
-    const sections = ['home', 'booking', 'about', 'contact'];
-
     if (show) {
         renderAdminDashboard();
         if (!document.getElementById('admin-link')) {
             const li = document.createElement('li');
             li.id = 'admin-link';
-            li.innerHTML = '<a href="#" class="accent-text" style="color:var(--primary); border:1px solid var(--primary); padding:5px 15px; border-radius:8px">Admin Panel</a>';
-            document.querySelector('.nav-links').prepend(li);
-            li.addEventListener('click', (e) => { e.preventDefault(); renderAdminDashboard(); });
+            li.innerHTML = '<a href="#" class="accent-text" style="color:var(--primary);border:1px solid var(--primary);padding:5px 15px;border-radius:8px">Admin Panel</a>';
+            document.querySelector('.nav-links')?.prepend(li);
+            li.onclick = (e) => { e.preventDefault(); renderAdminDashboard(); };
         }
     } else {
-        adminSec.classList.add('hidden');
-        sections.forEach(s => document.getElementById(s)?.classList.remove('hidden'));
+        adminSec?.classList.add('hidden');
+        ['home', 'booking', 'about', 'contact'].forEach(s => document.getElementById(s)?.classList.remove('hidden'));
         document.getElementById('admin-link')?.remove();
     }
 };
@@ -416,10 +408,11 @@ const toggleAdminPanel = (show) => {
 window.toggleAdminPanel = toggleAdminPanel;
 
 function animateValue(obj, end) {
+    if (!obj) return;
     const start = parseFloat(obj.innerText.replace(/[₹,]/g, '')) || 0;
-    const current = { val: start };
-    gsap.to(current, {
-        val: end, duration: 1, ease: "power2.out",
-        onUpdate: () => obj.innerText = `₹${current.val.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+    const curr = { val: start };
+    gsap.to(curr, {
+        val: end, duration: 0.8, ease: "power2.out",
+        onUpdate: () => obj.innerText = `₹${curr.val.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
     });
 }
