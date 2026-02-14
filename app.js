@@ -321,41 +321,99 @@ window.confirmBookingPayment = function () {
     }, 1500);
 };
 
-function toggleAdminPanel(show) {
-    const adminLink = document.getElementById('admin-link');
-    if (show) {
-        if (!adminLink) {
-            const li = document.createElement('li');
-            li.id = 'admin-link';
-            li.innerHTML = '<a href="#" class="btn-outline" style="color:var(--primary);border-color:var(--primary)">Admin Panel</a>';
-            document.querySelector('.nav-links').prepend(li);
-            li.addEventListener('click', renderAdminDashboard);
-        }
-    } else if (adminLink) adminLink.remove();
-}
-
 function renderAdminDashboard() {
-    document.getElementById('admin-section').classList.remove('hidden');
+    const adminSection = document.getElementById('admin-section');
+    adminSection.classList.remove('hidden');
     document.getElementById('home').classList.add('hidden');
     document.getElementById('booking').classList.add('hidden');
     document.getElementById('about').classList.add('hidden');
+    document.getElementById('contact').classList.add('hidden');
 
     const bookings = DB.getBookings();
-    document.getElementById('bookings-tbody').innerHTML = bookings.map(b => `
-        <tr style="border-bottom:1px solid var(--glass-border)">
-            <td style="padding:1rem">#${b.id.slice(-4)}</td>
-            <td style="padding:1rem">${b.userName}</td>
-            <td style="padding:1rem">${cleanDisplay(b.selections.dest)}</td>
-            <td style="padding:1rem">₹${b.totalPrice.toFixed(2)}</td>
-            <td style="padding:1rem">${b.status}</td>
-            <td style="padding:1rem">
-                <button onclick="DB.deleteBooking('${b.id}');renderAdminDashboard()" class="btn-outline" style="padding:5px">Delete</button>
+    const users = DB.getUsers();
+
+    // Stats
+    const totalRev = bookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
+    const statsHTML = `
+        <div class="admin-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Total Users</h4>
+                <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">${users.length}</div>
+            </div>
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Total Bookings</h4>
+                <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">${bookings.length}</div>
+            </div>
+            <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Revenue</h4>
+                <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">₹${totalRev.toLocaleString('en-IN')}</div>
+            </div>
+        </div>
+    `;
+
+    const existingStats = adminSection.querySelector('.admin-stats');
+    if (existingStats) existingStats.remove();
+    adminSection.querySelector('.section-header').insertAdjacentHTML('afterend', statsHTML);
+
+    // Bookings Table
+    document.getElementById('bookings-tbody').innerHTML = bookings.length === 0 ? '<tr><td colspan="6" style="text-align:center;padding:2rem">No bookings yet.</td></tr>' : bookings.map(b => `
+        <tr style="border-bottom: 1px solid var(--glass-border)">
+            <td style="padding: 1rem">#${b.id.slice(-4)}</td>
+            <td style="padding: 1rem; font-weight: 600">${b.userName}</td>
+            <td style="padding: 1rem; font-size: 0.85rem">${cleanDisplay(b.selections.dest)} | ${cleanDisplay(b.selections.flight)}</td>
+            <td style="padding: 1rem; color: var(--primary); font-weight: 700">₹${b.totalPrice.toFixed(2)}</td>
+            <td style="padding: 1rem"><span style="background:var(--primary)22; color:var(--primary); padding:3px 10px; border-radius:10px; font-size:0.75rem">${b.status}</span></td>
+            <td style="padding: 1rem">
+                <button onclick="DB.updateBookingStatus('${b.id}', 'Confirmed');renderAdminDashboard()" class="btn-primary" style="padding:5px 10px; font-size:0.7rem">Verify</button>
+                <button onclick="DB.deleteBooking('${b.id}');renderAdminDashboard()" class="btn-outline" style="padding:5px 10px; font-size:0.7rem; border-color:var(--primary); color:var(--primary)">Delete</button>
             </td>
+        </tr>
+    `).join('');
+
+    // Users Table
+    document.getElementById('users-tbody').innerHTML = users.map(u => `
+        <tr style="border-bottom: 1px solid var(--glass-border)">
+            <td style="padding: 1rem; font-weight: 600">${u.name}</td>
+            <td style="padding: 1rem; color: var(--text-muted)">${u.email}</td>
+            <td style="padding: 1rem"><span style="background: ${u.role === 'admin' ? '#ef444422' : '#var(--glass-border)'}; color: ${u.role === 'admin' ? '#ef4444' : 'var(--text-muted)'}; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem;">${u.role || 'User'}</span></td>
+            <td style="padding: 1rem; font-size: 0.8rem; color: var(--text-muted)">${new Date(u.created_at || Date.now()).toLocaleDateString()}</td>
         </tr>
     `).join('');
 }
 
-window.toggleAdminPanel = toggleAdminPanel; // Make global
+window.switchAdminTab = function (tabName) {
+    const tabs = document.querySelectorAll('.admin-tab');
+    tabs.forEach(t => {
+        const isActive = t.innerText.toLowerCase() === tabName.toLowerCase();
+        t.classList.toggle('active', isActive);
+        t.classList.toggle('btn-primary', isActive);
+        t.classList.toggle('btn-outline', !isActive);
+    });
+    document.getElementById('admin-bookings-tab').classList.toggle('hidden', tabName !== 'bookings');
+    document.getElementById('admin-users-tab').classList.toggle('hidden', tabName !== 'users');
+};
+
+const toggleAdminPanel = (show) => {
+    const adminSec = document.getElementById('admin-section');
+    const sections = ['home', 'booking', 'about', 'contact'];
+
+    if (show) {
+        renderAdminDashboard();
+        if (!document.getElementById('admin-link')) {
+            const li = document.createElement('li');
+            li.id = 'admin-link';
+            li.innerHTML = '<a href="#" class="accent-text" style="color:var(--primary); border:1px solid var(--primary); padding:5px 15px; border-radius:8px">Admin Panel</a>';
+            document.querySelector('.nav-links').prepend(li);
+            li.addEventListener('click', (e) => { e.preventDefault(); renderAdminDashboard(); });
+        }
+    } else {
+        adminSec.classList.add('hidden');
+        sections.forEach(s => document.getElementById(s)?.classList.remove('hidden'));
+        document.getElementById('admin-link')?.remove();
+    }
+};
+
+window.toggleAdminPanel = toggleAdminPanel;
 
 function animateValue(obj, end) {
     const start = parseFloat(obj.innerText.replace(/[₹,]/g, '')) || 0;
