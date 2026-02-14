@@ -476,6 +476,7 @@ async function renderAdminDashboard() {
     if (existingStats) existingStats.remove();
     adminSection.querySelector('.section-header').insertAdjacentHTML('afterend', statsHTML);
 
+    // Render Bookings
     const tbody = document.getElementById('bookings-tbody');
     tbody.innerHTML = bookings.length === 0 ? '<tr><td colspan="6" style="text-align:center; padding: 3rem; color: var(--text-muted);">No bookings found.</td></tr>' : bookings.map(b => `
         <tr style="border-bottom: 1px solid var(--glass-border);">
@@ -496,7 +497,39 @@ async function renderAdminDashboard() {
             </td>
         </tr>
     `).join('');
+
+    // Render Users
+    const utbody = document.getElementById('users-tbody');
+    utbody.innerHTML = users.map(u => `
+        <tr style="border-bottom: 1px solid var(--glass-border);">
+            <td style="padding: 1.5rem; font-weight: 600;">${u.name}</td>
+            <td style="padding: 1.5rem; color: var(--text-muted);">${u.email}</td>
+            <td style="padding: 1.5rem;">
+                <span style="background: ${u.role?.toLowerCase() === 'admin' ? '#ef444422' : '#var(--glass-border)'}; color: ${u.role?.toLowerCase() === 'admin' ? '#ef4444' : 'var(--text-muted)'}; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">
+                    ${u.role || 'User'}
+                </span>
+            </td>
+            <td style="padding: 1.5rem; font-size: 0.8rem; color: var(--text-muted);">${new Date(u.created_at).toLocaleDateString()}</td>
+        </tr>
+    `).join('');
 }
+
+window.switchAdminTab = function (tabName) {
+    const tabs = document.querySelectorAll('.admin-tab');
+    const contents = document.querySelectorAll('.admin-tab-content');
+
+    tabs.forEach(t => {
+        t.classList.toggle('active', t.innerText.toLowerCase() === tabName.toLowerCase());
+        if (t.innerText.toLowerCase() === tabName.toLowerCase()) {
+            t.classList.replace('btn-outline', 'btn-primary');
+        } else {
+            t.classList.replace('btn-primary', 'btn-outline');
+        }
+    });
+
+    document.getElementById(`admin-bookings-tab`).classList.toggle('hidden', tabName !== 'bookings');
+    document.getElementById(`admin-users-tab`).classList.toggle('hidden', tabName !== 'users');
+};
 
 window.updateBookingStatus = async function (id, currentStatus) {
     const newStatus = currentStatus === 'Confirmed' ? 'Pending' : 'Confirmed';
