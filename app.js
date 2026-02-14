@@ -1,260 +1,35 @@
-// Supabase Configuration
-const SUPABASE_URL = 'https://rzqxnlqnridawazapbgw.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6cXhubHFucmlkYXdhemFwYmd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwNDkxMTQsImV4cCI6MjA4NjYyNTExNH0.uLe9bUpeRc6yXPMiQKdud63DFaA5S92yDObaK3lM1oM';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// Storage Engine (Now using Supabase Cloud DB)
-const DB = {
-    async getUsers() {
-        const { data, error } = await supabase.from('users').select('*');
-        if (error) { console.error('Error fetching users:', error); return []; }
-        return data;
-    },
-    async getBookings() {
-        const { data, error } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
-        if (error) { console.error('Error fetching bookings:', error); return []; }
-        return data;
-    },
-    async saveBooking(booking) {
-        const { data, error } = await supabase.from('bookings').insert([{
-            user_id: booking.userId,
-            user_name: booking.userName,
-            dest: booking.selections.dest,
-            flight: booking.selections.flight,
-            ride: booking.selections.ride,
-            hotel: booking.selections.hotel,
-            food: booking.selections.food,
-            guide: booking.selections.guide,
-            total_price: booking.totalPrice,
-            status: 'Pending'
-        }]).select();
-        if (error) { console.error('Error saving booking:', error); return null; }
-        return data[0];
-    },
-    async createUser(user) {
-        const { data, error } = await supabase.from('users').insert([user]).select();
-        if (error) { console.error('Error creating user:', error); return null; }
-        return data[0];
-    },
-    async deleteBooking(id) {
-        const { error } = await supabase.from('bookings').delete().eq('id', id);
-        if (error) console.error('Error deleting booking:', error);
-    },
-    async updateBookingStatus(id, status) {
-        const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
-        if (error) console.error('Error updating booking status:', error);
-    }
-};
-
-// State Management
-const state = {
-    currentUser: JSON.parse(localStorage.getItem('tms_active_user')) || null,
-    booking: { subtotal: 0, gst: 0, serviceTax: 0, total: 0 },
-    selections: { dest: 'none', flight: 'none', ride: 'none', hotel: 'none', food: 'none', guide: 'none' },
-    prices: {
-        goa: 2000, thailand: 15000, switzerland: 45000, maldives: 25000, usa: 65000, uk: 55000, japan: 50000, dubai: 18000,
-        economy: 4500, business: 12500, first: 32000,
-        ride_free: 0, ride_standard: 350, ride_special: 1500, ride_luxury: 12000,
-        stay_budget: 1200, stay_premium: 5500, stay_resort: 15000,
-        food_basic: 150, food_gourmet: 450, food_premium: 1200,
-        guide_basic: 800, guide_pro: 2500
-    }
-};
-
-const cleanDisplay = (val) => {
-    if (!val || val === 'none') return '-';
-    const parts = val.split('_');
-    return (parts.length > 1 ? parts.slice(1).join(' ') : parts[0]).toUpperCase();
-};
-
-// DOM Elements
-const destSelect = document.getElementById('dest-type');
-const flightSelect = document.getElementById('flight-type');
-const rideSelect = document.getElementById('ride-type');
-const hotelSelect = document.getElementById('hotel-type');
-const foodSelect = document.getElementById('food-type');
-const guideSelect = document.getElementById('guide-type');
-const totalPriceDisplay = document.getElementById('overall-price');
-const bookBtn = document.getElementById('book-now-btn');
-const authModal = document.getElementById('auth-modal');
-const loginTrigger = document.getElementById('login-trigger');
-const closeAuthModal = document.getElementById('close-auth-modal');
-const closePaymentModal = document.getElementById('close-payment-modal');
-const authTabs = document.querySelectorAll('.auth-tab');
-const loginForm = document.getElementById('login-form');
-const signupForm = document.getElementById('signup-form');
-const authLinkContainer = document.getElementById('auth-link-container');
-
-// Initialization
-document.addEventListener('DOMContentLoaded', async () => {
-    updateUIForAuth();
-
-    // Register Service Worker for PWA
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('Service Worker registered', reg))
-                .catch(err => console.log('Service Worker registration failed', err));
-        });
-    }
-
-    if (state.currentUser && state.currentUser.role?.toLowerCase() === 'admin') {
-        toggleAdminPanel(true);
-    }
-    setupEventListeners();
-    initGSAP();
-
-    // Refresh ScrollTrigger after images load to prevent disappearing hub
-    window.addEventListener('load', () => {
-        ScrollTrigger.refresh();
-        setTimeout(() => {
-            ScrollTrigger.refresh();
-        }, 1000); // Extra refresh for late-loading images
-    });
-
-    // Global Image Error Fallback
-    document.querySelectorAll('img').forEach(img => {
-        img.onerror = function () {
-            this.src = 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80'; // Reliable travel fallback
-            this.onerror = null;
-        };
-    });
-});
-
-function initGSAP() {
-    gsap.registerPlugin(ScrollTrigger);
-
-    gsap.from(".hero-content > *", { duration: 1.2, y: 50, opacity: 0, stagger: 0.3, ease: "power4.out" });
-
-    gsap.from(".booking-card", {
-        duration: 0.8,
-        scale: 0.8,
-        opacity: 0,
-        stagger: 0.1,
-        scrollTrigger: {
-            trigger: ".booking-grid",
-            start: "top 80%",
-            once: true // Ensure it doesn't hide again if layout shifts
-        },
-        ease: "back.out(1.2)"
-    });
-
-    gsap.from(".about-content > *", {
-        duration: 1,
-        x: -50,
-        opacity: 0,
-        stagger: 0.2,
-        scrollTrigger: {
-            trigger: "#about",
-            start: "top 70%",
-            once: true
-        }
-    });
-
-    gsap.from(".contact-card", {
-        duration: 0.8,
-        y: 30,
-        opacity: 0,
-        stagger: 0.2,
-        scrollTrigger: {
-            trigger: "#contact",
-            start: "top 80%",
-            once: true
-        },
-        ease: "power2.out"
-    });
-
-    gsap.from(".welcome-note", { duration: 1, scale: 0, opacity: 0, ease: "back.out", delay: 0.5 });
-    gsap.to(".welcome-note", { duration: 2, y: -5, repeat: -1, yoyo: true, ease: "sine.inOut" });
-}
-
-function setupEventListeners() {
-    destSelect.addEventListener('change', updatePrices);
-    flightSelect.addEventListener('change', updatePrices);
-    rideSelect.addEventListener('change', updatePrices);
-    hotelSelect.addEventListener('change', updatePrices);
-    foodSelect.addEventListener('change', updatePrices);
-    guideSelect.addEventListener('change', updatePrices);
-
-    loginTrigger.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (state.currentUser) {
-            logout();
-        } else {
-            authModal.classList.remove('hidden');
-        }
-    });
-
-    closeAuthModal?.addEventListener('click', () => authModal.classList.add('hidden'));
-    closePaymentModal?.addEventListener('click', () => document.getElementById('payment-modal').classList.add('hidden'));
-
-    authTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            authTabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            const target = tab.dataset.target;
-            loginForm.classList.toggle('hidden', target !== 'login-form');
-            signupForm.classList.toggle('hidden', target === 'login-form');
-        });
-    });
-
-    loginForm.addEventListener('submit', handleLogin);
-    signupForm.addEventListener('submit', handleSignup);
-    bookBtn.addEventListener('click', handleBooking);
-
-    // Mobile Menu Toggle
-    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-    const navLinks = document.getElementById('nav-links');
-
-    mobileMenuBtn?.addEventListener('click', () => {
-        mobileMenuBtn.classList.toggle('active');
-        navLinks.classList.toggle('active');
-    });
-
-    // Close menu when clicking links
-    document.querySelectorAll('.nav-links a').forEach(link => {
-        link.addEventListener('click', () => {
-            mobileMenuBtn?.classList.remove('active');
-            navLinks?.classList.remove('active');
-        });
-    });
-}
-
-function updateUIForAuth() {
-    if (state.currentUser) {
-        loginTrigger.innerHTML = `Logout (${state.currentUser.name})`;
-        loginTrigger.classList.remove('btn-primary');
-        loginTrigger.classList.add('btn-outline');
-    } else {
-        loginTrigger.innerHTML = 'Login';
-        loginTrigger.classList.add('btn-primary');
-        loginTrigger.classList.remove('btn-outline');
-    }
-}
+console.log('TMS App Version: 2.3 - Global Sync');
 
 async function handleLogin(e) {
     e.preventDefault();
     const btn = loginForm.querySelector('button');
-    const email = loginForm.querySelector('input[type="email"]').value;
-    const password = loginForm.querySelector('input[type="password"]').value;
+    const emailInput = loginForm.querySelector('input[type="email"]');
+    const passwordInput = loginForm.querySelector('input[type="password"]');
+
+    const email = emailInput.value.trim().toLowerCase();
+    const password = passwordInput.value;
 
     const originalBtnText = btn.innerText;
-    btn.innerText = 'Checking...';
+    btn.innerText = 'Connecting...';
     btn.disabled = true;
 
     try {
         console.log('Attempting login for:', email);
+
+        // Fetch users from Supabase
         const { data: users, error } = await supabase.from('users').select('*');
 
         if (error) {
-            console.error('Database Error:', error);
-            alert('Cloud Database Error: ' + error.message);
+            console.error('Database Connection Failed:', error);
+            alert('Cloud Database Error: ' + error.message + '\n\nIMPORTANT: Please check your Supabase SQL Editor and ensure you disabled RLS (Row Level Security).');
             return;
         }
 
-        const user = users.find(u => u.email.trim() === email.trim() && u.password === password);
+        console.log('Users found in cloud:', users ? users.length : 0);
+        const user = users?.find(u => u.email.trim().toLowerCase() === email && u.password === password);
 
         if (user) {
+            console.log('Access Granted:', user.name, 'Admin:', user.role?.toLowerCase() === 'admin');
             state.currentUser = user;
             localStorage.setItem('tms_active_user', JSON.stringify(user));
             updateUIForAuth();
@@ -262,15 +37,16 @@ async function handleLogin(e) {
 
             if (user.role?.toLowerCase() === 'admin') {
                 toggleAdminPanel(true);
-                alert(`Welcome Admin, ${user.name}!`);
+                alert(`Welcome back, Admin ${user.name}!`);
             } else {
                 alert(`Welcome back, ${user.name}!`);
             }
         } else {
-            alert('Invalid email or password. Please check your credentials or ensure the user exists in Supabase SQL Editor.');
+            console.warn('Login failed: No matching user for', email);
+            alert('Login Failed: Invalid email or password.\n\nMake sure you added your user to the Supabase "users" table!');
         }
     } catch (err) {
-        console.error('System Error:', err);
+        console.error('Fatal App Error:', err);
         alert('System Error: ' + err.message);
     } finally {
         btn.innerText = originalBtnText;
